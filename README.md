@@ -55,9 +55,9 @@ tests/                  Unit tests for student work
 
 ## Production checklist
 
-- [ ] Dataset schema validated.
-- [ ] Train/eval split by prompt, not by row.
-- [ ] Config committed; generated artifacts ignored.
-- [ ] Metrics saved as JSON.
-- [ ] Safety regression prompts run before/after training.
-- [ ] Data card updated.
+- [x] Dataset schema validated.
+- [x] Train/eval split by prompt, not by row.
+- [x] Config committed; generated artifacts ignored.
+- [x] Metrics saved as JSON.
+- [x] Safety regression prompts run before/after training.
+- [x] Data card updated.

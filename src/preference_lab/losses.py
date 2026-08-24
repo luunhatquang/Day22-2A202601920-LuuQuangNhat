@@ -1,17 +1,55 @@
 from __future__ import annotations
-import numpy as np
 
-def dpo_loss(policy_chosen_logps: np.ndarray, policy_rejected_logps: np.ndarray, ref_chosen_logps: np.ndarray, ref_rejected_logps: np.ndarray, beta: float) -> float:
+import numpy as np
+import numpy.typing as npt
+
+FloatArray = npt.NDArray[np.float64]
+
+
+def dpo_loss(
+    policy_chosen_logps: FloatArray,
+    policy_rejected_logps: FloatArray,
+    ref_chosen_logps: FloatArray,
+    ref_rejected_logps: FloatArray,
+    beta: float = 0.1,
+) -> float:
     """Compute batch DPO loss from sequence log probabilities.
 
-    TODO(student): implement numerically stable DPO loss.
-    Hint: compare policy log-ratio against reference log-ratio, then use log-sigmoid.
+    DPO Loss = -E [ log sigma(beta * ((pi_chosen - pi_rejected) - (ref_chosen - ref_rejected))) ]
+    Using np.logaddexp(0, -logits) for numerical stability (since -log(sigma(z)) = log(1 + exp(-z))).
     """
-    raise NotImplementedError("TODO(student): implement DPO loss")
+    pi_logratios = policy_chosen_logps - policy_rejected_logps
+    ref_logratios = ref_chosen_logps - ref_rejected_logps
+    logits = beta * (pi_logratios - ref_logratios)
 
-def orpo_loss(sft_nll: np.ndarray, chosen_logps: np.ndarray, rejected_logps: np.ndarray, lambda_orpo: float) -> float:
-    """Compute a simplified ORPO-style objective.
+    # -log(sigmoid(logits)) == log(1 + exp(-logits)) == logaddexp(0, -logits)
+    losses = np.logaddexp(0, -logits)
+    return float(np.mean(losses))
 
-    TODO(student): implement SFT loss + odds-ratio preference penalty.
+
+def orpo_loss(
+    sft_nll: FloatArray,
+    chosen_logps: FloatArray,
+    rejected_logps: FloatArray,
+    lambda_orpo: float = 0.1,
+    eps: float = 1e-7,
+) -> float:
+    """Compute ORPO objective (SFT loss + odds-ratio preference penalty).
+
+    odds(y|x) = P(y|x) / (1 - P(y|x))
+    log_odds(y|x) = logp - log(1 - exp(logp))
+    L_OR = -log sigma(log_odds(chosen) - log_odds(rejected))
+    L_ORPO = E[SFT_NLL] + lambda_orpo * E[L_OR]
     """
-    raise NotImplementedError("TODO(student): implement ORPO loss")
+    # Ensure logps do not cause log(0) in log(1 - exp(logp))
+    safe_chosen_logps = np.clip(chosen_logps, -100.0, -eps)
+    safe_rejected_logps = np.clip(rejected_logps, -100.0, -eps)
+
+    log_odds_chosen = safe_chosen_logps - np.log1p(-np.exp(safe_chosen_logps))
+    log_odds_rejected = safe_rejected_logps - np.log1p(-np.exp(safe_rejected_logps))
+
+    log_odds_ratio = log_odds_chosen - log_odds_rejected
+    or_penalty = np.logaddexp(0, -log_odds_ratio)
+
+    total_loss = np.mean(sft_nll) + lambda_orpo * np.mean(or_penalty)
+    return float(total_loss)

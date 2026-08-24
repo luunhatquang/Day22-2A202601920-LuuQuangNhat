@@ -2,7 +2,7 @@
 setup:
 	pip install -e '.[dev]'
 test:
-	pytest -q
+	PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=src pytest -q
 lint:
 	ruff check src tests
 typecheck:
